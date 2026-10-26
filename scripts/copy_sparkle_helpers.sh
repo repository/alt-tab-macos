@@ -120,4 +120,7 @@ done
 # linker-signed adhoc seal in place — which then fails `codesign --verify --deep --strict`
 # because that seal references resources the framework no longer matches.
 IDENT="${EXPANDED_CODE_SIGN_IDENTITY:-${CODE_SIGN_IDENTITY:--}}"
+if [ "${CODE_SIGNING_ALLOWED:-YES}" = "NO" ]; then
+    IDENT="-"
+fi
 codesign --force --sign "$IDENT" "$SPARKLE_FW"

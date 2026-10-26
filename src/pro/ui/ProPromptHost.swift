@@ -78,6 +78,7 @@ class ProPromptHost {
     }
 
     func dispatch(_ action: ProPromptAction) {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         switch action {
         case .refreshBadge, .dismissAllProWindows: break
         default: SearchDiscoveryHint.shared.cancel()

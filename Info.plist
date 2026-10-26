@@ -7,6 +7,10 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleDisplayName</key>
+	<string>AltTab Unrestricted</string>
+	<key>UnrestrictedBaseRevision</key>
+	<string>c500294bdb01186011a5c64a412b04cef9931bef</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundlePackageType</key>

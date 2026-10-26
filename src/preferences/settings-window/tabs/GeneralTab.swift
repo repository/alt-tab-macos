@@ -24,6 +24,11 @@ class GeneralTab {
         updatesPolicyDropdown = LabelAndControl.makeDropdown("updatePolicy", UpdatePolicyPreference.allCases)
         let checkForUpdates = NSButton(title: NSLocalizedString("Check for updates now…", comment: ""), target: nil, action: nil)
         checkForUpdates.onAction = { control in checkForUpdatesNow(control) }
+        updatesPolicyDropdown?.isEnabled = false
+        updatesPolicyDropdown?.selectItem(at: 0)
+        updatesPolicyDropdown?.toolTip = "Updates are installed manually."
+        checkForUpdates.isEnabled = false
+        checkForUpdates.toolTip = "Build and install updates from source."
         crashPolicyDropdown = LabelAndControl.makeDropdown("crashPolicy", CrashPolicyPreference.allCases)
         let crashPolicy = TableGroupView.Row(leftTitle: NSLocalizedString("Crash reports policy", comment: ""),
             rightViews: [crashPolicyDropdown!])
@@ -76,7 +81,7 @@ class GeneralTab {
     static func refreshControlsFromPreferences() {
         menubarIconDropdown?.selectItem(at: CachedUserDefaults.intFromMacroPref("menubarIcon", MenubarIconPreference.allCases))
         menubarIconDropdown?.isEnabled = Preferences.menubarIconShown
-        updatesPolicyDropdown?.selectItem(at: CachedUserDefaults.intFromMacroPref("updatePolicy", UpdatePolicyPreference.allCases))
+        updatesPolicyDropdown?.selectItem(at: 0)
         crashPolicyDropdown?.selectItem(at: CachedUserDefaults.intFromMacroPref("crashPolicy", CrashPolicyPreference.allCases))
     }
 
@@ -97,10 +102,7 @@ class GeneralTab {
     }
 
     @objc static func checkForUpdatesNow(_ sender: Any?) {
-        // The updater is lazy-started 30s after launch; if the user presses this button before
-        // then, defensively start it first (idempotent — second call is a no-op).
-        App.updaterController?.startUpdater()
-        App.updaterController?.checkForUpdates(sender)
+        return
     }
 
     private static func exportSettings() {

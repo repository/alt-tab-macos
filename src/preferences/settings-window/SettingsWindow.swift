@@ -542,6 +542,7 @@ class SettingsWindow: NSWindow {
         upgradeButton.action = #selector(upgradeButtonClicked)
         upgradeButton.translatesAutoresizingMaskIntoConstraints = false
         parent.addSubview(upgradeButton)
+        upgradeButton.isHidden = LicenseManager.isUnrestrictedBuild
         // Align with the sidebar source-list highlight: the scroll view sits flush against the
         // sidebar edges and `.sourceList` adds its own ~10pt internal inset, so the highlight
         // pill ends up at `sidebarHorizontalPadding` from each edge — same as the search field.
@@ -1126,6 +1127,7 @@ class SettingsWindow: NSWindow {
     }
 
     func showUpgradeView() {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         guard !isShowingUpgradeView else { return }
         isShowingUpgradeView = true
         sidebarTableView.deselectAll(nil)

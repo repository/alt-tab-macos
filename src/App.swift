@@ -14,7 +14,7 @@ class App: AppCenterApplication {
     static let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as! String
     static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as! String
     static let licence = Bundle.main.object(forInfoDictionaryKey: "NSHumanReadableCopyright") as! String
-    static let repository = "https://github.com/lwouis/alt-tab-macos"
+    static let repository = "https://github.com/repository/alt-tab-macos"
     static let appIcon: CGImage = {
         let url = Bundle.main.url(forResource: "app", withExtension: "png")!
         let source = CGImageSourceCreateWithURL(url as CFURL, nil)!
@@ -152,6 +152,7 @@ class App: AppCenterApplication {
     }
 
     @objc static func supportProject() {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         NSWorkspace.shared.open(URL(string: Endpoints.supportUrl)!)
     }
 
@@ -160,6 +161,7 @@ class App: AppCenterApplication {
     }
 
     @objc static func openAccount() {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         UpgradeTab.openAccountPage()
     }
 
@@ -572,18 +574,6 @@ class App: AppCenterApplication {
         // Needs the AX runloop `BackgroundWork.start()` created, so it cannot go with the launch-time setup.
         AxObserverRegistry.shared.startRecoveryTicks()
         CliEvents.observe()
-        App.sparkleDelegate = SparkleDelegate()
-        App.updaterController = SPUStandardUpdaterController(
-            startingUpdater: false,
-            updaterDelegate: App.sparkleDelegate!,
-            userDriverDelegate: nil)
-        #if DEBUG
-        if !Preferences.qaPristine && !QaLifecycle.enabled {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 30) { App.updaterController?.startUpdater() }
-        }
-        #else
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30) { App.updaterController?.startUpdater() }
-        #endif
         PreferencesEvents.initialize()
         #if DEBUG
         BenchmarkRunner.startIfNeeded()
@@ -605,10 +595,6 @@ class App: AppCenterApplication {
         #endif
         SearchDiscoveryHint.shared.initialize()
         UsageStats.prune()
-        // Created now rather than on the first prompt: its observers cancel prompts queued before that.
-        let promptHost = ProPromptHost.shared
-        ProTransitionManager.shared.onAction = { promptHost.dispatch($0) }
-        ProTransitionManager.shared.onAppLaunchComplete()
         #if DEBUG
         if QaLifecycle.enabled { QaLifecycle.finishedLaunching = true; QaLifecycle.launchCount += 1 }
         #endif
@@ -618,7 +604,6 @@ class App: AppCenterApplication {
 
 extension App: NSApplicationDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
-        App.appCenterDelegate = AppCenterCrash()
         App.shared.disableRelaunchOnLogin()
         Logger.initialize()
         MainThreadStall.observe()
@@ -664,36 +649,8 @@ extension App: NSApplicationDelegate {
         WindowServerEvents.observe()
         AXUIElement.setGlobalTimeout()
         PreferencesPersistenceCheck.runInBackground()
-        LicenseManager.shared.onActivationSucceeded = {
-            DispatchQueue.main.async { ProActivationPopover.show() }
-        }
-        LicenseManager.shared.onBeforeProUnlock = {
-            if !LicenseManager.shared.isMocked { ProTransitionManager.shared.onProUnlocked() }
-        }
-        LicenseManager.shared.onStateChanged = { state in
-            Menubar.refreshLicenseMenuItems()
-            if !LicenseManager.shared.isMocked {
-                syncLicenseCookie(state: state)
-                ProTransitionManager.shared.onLicenseStateChanged()
-            }
-            UpgradeTab.refreshStatus()
-            SettingsWindow.shared?.refreshUpgradeButton()
-            App.resetPreferencesDependentComponents()
-            // `isProLocked` reads from state, so a state change implicitly changes the lock.
-            // Notify UI observers so Settings rows repaint their ghost/pro-locked styling.
-            NotificationCenter.default.post(name: ProTransitionManager.proLockStateDidChangeNotification, object: nil)
-        }
-        #if DEBUG
-        // The QA launch never initializes persisted licensing: its in-memory state must neither read nor
-        // alter the real license, and it must not schedule a revalidation that can later replace the mock.
-        if CommandLine.arguments.contains("--mock-pro") {
-            LicenseManager.shared.mockProUser()
-        } else {
-            LicenseManager.shared.initialize()
-        }
-        #else
         LicenseManager.shared.initialize()
-        #endif
+        ProTransitionState().onProUnlocked()
         SystemPermissions.ensurePermissionsAreGranted()
     }
 
@@ -706,6 +663,7 @@ extension App: NSApplicationDelegate {
     }
 
     private func handleCustomUrl(_ url: URL) {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         guard url.host == "activate",
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let licenseKey = components.queryItems?.first(where: { $0.name == "license_key" })?.value,

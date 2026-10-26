@@ -8,7 +8,7 @@ class AboutTab {
         appIcon.updateContents(.cgImage(App.appIcon), appIconSize)
         appIcon.fit(128, 128)
         let appText = StackView([
-            BoldLabel(App.name),
+            BoldLabel(App.name + " Unrestricted"),
             NSTextField(labelWithString: NSLocalizedString("Version", comment: "") + " " + App.version),
             NSTextField(labelWithString: App.licence),
             HyperlinkLabel(NSLocalizedString("Website", comment: ""), Endpoints.website),
@@ -37,6 +37,7 @@ class AboutTab {
 
     static func makeSupportProjectButton() -> NSButton {
         let button = makeButtonWithIcon(NSLocalizedString("Support this project", comment: ""), App.supportProjectAction, "heart.fill", .red, App.self)
+        button.isHidden = LicenseManager.isUnrestrictedBuild
         styleSupportProjectButton(button)
         return button
     }

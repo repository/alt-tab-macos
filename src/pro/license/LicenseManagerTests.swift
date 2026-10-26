@@ -23,6 +23,59 @@ final class LicenseManagerTests: XCTestCase {
         super.tearDown()
     }
 
+    func testUnrestrictedBuildNeverStartsTrialOrCallsLicenseServer() {
+        let unrestrictedManager = LicenseManager(clock: clock, keychain: keychain, api: api, defaults: defaults, unrestricted: true)
+        unrestrictedManager.initialize()
+        unrestrictedManager.onAppBecameUsable(accessibility: .granted, screenRecording: .granted)
+        clock.advance(days: 3650)
+        unrestrictedManager.refreshState()
+        unrestrictedManager.scheduleAsyncRevalidationIfNeeded()
+        unrestrictedManager.revalidateWithServer()
+        XCTAssertEqual(unrestrictedManager.state, .pro)
+        XCTAssertTrue(unrestrictedManager.isProAvailable)
+        XCTAssertFalse(unrestrictedManager.isProLocked)
+        XCTAssertNil(unrestrictedManager.trialStartDate)
+        XCTAssertNil(defaults.object(forKey: "trialStartDate"))
+        XCTAssertTrue(api.validateCalls.isEmpty)
+        XCTAssertTrue(api.activateCalls.isEmpty)
+        XCTAssertTrue(api.deactivateCalls.isEmpty)
+        XCTAssertEqual(keychain.readCount, 0)
+    }
+
+    func testUnrestrictedBuildIgnoresExpiredStoredLicenseAndPreservesIt() {
+        keychain.setValue("existing-key", account: LicenseManager.keychainKeyAccount)
+        keychain.setValue("existing-instance", account: LicenseManager.keychainInstanceAccount)
+        defaults.set(false, forKey: "lastValidationResult")
+        let unrestrictedManager = LicenseManager(clock: clock, keychain: keychain, api: api, defaults: defaults, unrestricted: true)
+        unrestrictedManager.initialize()
+        XCTAssertEqual(unrestrictedManager.computeState(), .pro)
+        XCTAssertEqual(keychain.value(account: LicenseManager.keychainKeyAccount), "existing-key")
+        XCTAssertEqual(keychain.value(account: LicenseManager.keychainInstanceAccount), "existing-instance")
+        XCTAssertFalse(defaults.bool(forKey: "lastValidationResult"))
+        XCTAssertTrue(api.validateCalls.isEmpty)
+    }
+
+    func testUnrestrictedBuildRejectsLicenseOperationsWithoutNetworkCalls() {
+        let unrestrictedManager = LicenseManager(clock: clock, keychain: keychain, api: api, defaults: defaults, unrestricted: true)
+        var completions = 0
+        unrestrictedManager.activate("unused") { result in
+            if case .success = result { XCTFail("Unrestricted builds must not claim paid activation") }
+            completions += 1
+        }
+        unrestrictedManager.deactivate { result in
+            if case .success = result { XCTFail("Unrestricted builds must not deactivate paid licenses") }
+            completions += 1
+        }
+        unrestrictedManager.deactivateInstance(licenseKey: "unused", instanceId: "unused") { result in
+            if case .success = result { XCTFail("Unrestricted builds must not contact the account service") }
+            completions += 1
+        }
+        XCTAssertEqual(completions, 3)
+        XCTAssertTrue(api.activateCalls.isEmpty)
+        XCTAssertTrue(api.deactivateCalls.isEmpty)
+        XCTAssertEqual(unrestrictedManager.state, .pro)
+    }
+
     func testActivationCelebratesOnceButValidationAndRepeatedActivationDoNot() {
         manager.initialize()
         var celebrations = 0
@@ -723,10 +776,14 @@ final class MockClock: Clock {
 
 final class MockKeychain: Keychain {
     private var store: [String: String] = [:]
+    private(set) var readCount = 0
     var setValueStatus: (String) -> OSStatus = { _ in errSecSuccess }
     var removeStatus: (String) -> OSStatus = { _ in errSecSuccess }
 
-    func value(account: String) -> String? { store[account] }
+    func value(account: String) -> String? {
+        readCount += 1
+        return store[account]
+    }
 
     @discardableResult
     func setValue(_ value: String, account: String) -> OSStatus {

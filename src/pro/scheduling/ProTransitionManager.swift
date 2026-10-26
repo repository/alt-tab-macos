@@ -146,6 +146,7 @@ class ProTransitionManager {
     }
 
     private func emit(_ action: ProPromptAction) {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         #if DEBUG
         if QaLifecycle.enabled { QaLifecycle.actions.append(String(describing: action)) }
         #endif
@@ -173,7 +174,8 @@ class ProTransitionManager {
     var hasTriggeredPostExpirationSwitcher: Bool { get { state.hasTriggeredPostExpirationSwitcher } set { state.hasTriggeredPostExpirationSwitcher = newValue } }
 
     var shouldShowBadgeDot: Bool {
-        ProTransitionManagerTestable.shouldShowBadgeDot(currentState())
+        guard !LicenseManager.isUnrestrictedBuild else { return false }
+        return ProTransitionManagerTestable.shouldShowBadgeDot(currentState())
     }
 
     func cancelPendingPrompts() {
@@ -195,6 +197,7 @@ class ProTransitionManager {
     private var launchCompleted = false
 
     func onAppLaunchComplete() {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         launchCompleted = true
         scheduler.onAppLaunchComplete()
     }
@@ -276,6 +279,7 @@ class ProTransitionManager {
     /// Called from App.showUiOrCycleSelection() at the start of a fresh switcher session (not on cycle).
     /// Decides whether to queue a Day 4 tour or a post-expiration free-pass + [C] for after dismissal.
     func onSwitcherShown() {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         guard !switcherIsShown else { return }
         refreshFreePassPreferencesIfNeeded()
         switcherIsShown = true
@@ -315,6 +319,7 @@ class ProTransitionManager {
 
     /// Returns true if the feature should be allowed to execute
     func attemptHardGatedFeature(_ feature: ProFeature) -> Bool {
+        guard !LicenseManager.isUnrestrictedBuild else { return true }
         let action = ProTransitionManagerTestable.evaluateHardGate(currentState())
         if action != .allow && action != .unavailable {
             state.recordIntent(feature.journeyFeature)
@@ -352,6 +357,7 @@ class ProTransitionManager {
     }
 
     func onProLockEngaged() {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         state.onProLockEngaged()
         NotificationCenter.default.post(name: Self.proLockStateDidChangeNotification, object: nil)
     }
@@ -394,6 +400,7 @@ class ProTransitionManager {
     // MARK: - Checkout helper
 
     static func openCheckout(from origin: CheckoutOrigin) {
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         NSWorkspace.shared.open(Endpoints.checkoutUrl(from: origin, trialDay: LicenseManager.shared.trialDay))
     }
 

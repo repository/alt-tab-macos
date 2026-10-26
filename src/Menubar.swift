@@ -37,16 +37,19 @@ class Menubar {
         addMenuItem(NSLocalizedString("Show", comment: "Menubar option"), #selector(App.showUiFromShortcut0), "", "eye", nil, App.self)
         menu.addItem(NSMenuItem.separator())
         addMenuItem(NSLocalizedString("Settings…", comment: "Menubar option"), #selector(App.showSettingsWindow), ",", "gear", nil, App.self)
-        addMenuItem(NSLocalizedString("Check for updates…", comment: "Menubar option"), #selector(App.checkForUpdatesNow), "", "checkmark.arrow.trianglehead.clockwise", nil, App.self)
+        let upstreamUpdates = addMenuItem(NSLocalizedString("Check for updates…", comment: "Menubar option"), #selector(App.checkForUpdatesNow), "", "checkmark.arrow.trianglehead.clockwise", nil, App.self)
+        upstreamUpdates.isHidden = true
         addMenuItem(NSLocalizedString("Check permissions…", comment: "Menubar option"), #selector(App.checkPermissions), "", "hand.raised", nil, App.self)
         menu.addItem(NSMenuItem.separator())
         addMenuItem(String(format: NSLocalizedString("About %@", comment: "Menubar option. %@ is AltTab"), App.name), #selector(App.showAboutWindow), "", "info.circle", nil, App.self)
         addMenuItem(NSLocalizedString("Debug tools", comment: "Menubar option"), #selector(App.showDebugWindow), "", "scope", nil, App.self)
         addMenuItem(NSLocalizedString("Send feedback", comment: "Menubar option") + "…", #selector(App.showFeedbackPanel), "", "text.bubble", nil, App.self)
-        upgradeToProMenuItem = addMenuItem(NSLocalizedString("Get Pro", comment: "Menubar option"), App.upgradeToProAction, "", "star.fill", nil, App.self)
-        upgradeToProMenuItem.view = UpgradeMenuItemView()
-        myAccountMenuItem = addMenuItem(NSLocalizedString("My Account", comment: ""), App.openAccountAction, "", "person.crop.circle", nil, App.self)
-        supportProjectMenuItem = addMenuItem(NSLocalizedString("Support this project", comment: "Menubar option"), App.supportProjectAction, "", "heart.fill", .red, App.self)
+        if !LicenseManager.isUnrestrictedBuild {
+            upgradeToProMenuItem = addMenuItem(NSLocalizedString("Get Pro", comment: "Menubar option"), App.upgradeToProAction, "", "star.fill", nil, App.self)
+            upgradeToProMenuItem.view = UpgradeMenuItemView()
+            myAccountMenuItem = addMenuItem(NSLocalizedString("My Account", comment: ""), App.openAccountAction, "", "person.crop.circle", nil, App.self)
+            supportProjectMenuItem = addMenuItem(NSLocalizedString("Support this project", comment: "Menubar option"), App.supportProjectAction, "", "heart.fill", .red, App.self)
+        }
         refreshLicenseMenuItems()
         menu.addItem(NSMenuItem.separator())
         addMenuItem(String(format: NSLocalizedString("Quit %@", comment: "%@ is AltTab"), App.name), #selector(NSApplication.terminate(_:)), "q", nil) // "xmark.rectangle" is not necessary; macos automatically recognizes Quit
@@ -83,6 +86,12 @@ class Menubar {
 
     static func refreshLicenseMenuItems() {
         guard upgradeToProMenuItem != nil else { return }
+        if LicenseManager.isUnrestrictedBuild {
+            toggleUpgradeMenuItem(false)
+            supportProjectMenuItem.isHidden = true
+            myAccountMenuItem.isHidden = true
+            return
+        }
         let state = LicenseManager.shared.state
         switch state {
         case .trialNotStarted:
@@ -226,6 +235,7 @@ class Menubar {
     static private func updateBadgeDotOverlay() {
         badgeDotLayer?.removeFromSuperlayer()
         badgeDotLayer = nil
+        guard !LicenseManager.isUnrestrictedBuild else { return }
         guard ProTransitionManager.shared.shouldShowBadgeDot, let button = statusItem?.button else { return }
         button.wantsLayer = true
         guard let buttonLayer = button.layer else { return }
